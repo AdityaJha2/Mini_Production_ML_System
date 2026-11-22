@@ -1,0 +1,12 @@
+{
+  "records": [
+    {"transaction_id": "T-EX-1", "timestamp": "2025-05-03T23:10:00", "customer_id": "C00007",
+     "amount": 480.0, "merchant_category": "luxury_goods", "channel": "online", "is_international": 1,
+     "device_new": 1, "txn_count_1h": 3, "txn_count_24h": 5, "account_age_days": 30,
+     "amount_mean_30d": 40.0, "seconds_since_last_txn": 120.0},
+    {"transaction_id": "T-EX-2", "timestamp": "2025-05-04T11:05:00", "customer_id": "C00123",
+     "amount": 23.5, "merchant_category": "grocery", "channel": "pos", "is_international": 0,
+     "device_new": 0, "txn_count_1h": 0, "txn_count_24h": 1, "account_age_days": 1200,
+     "amount_mean_30d": 31.0, "seconds_since_last_txn": 86400.0}
+  ]
+}

@@ -1,0 +1,161 @@
+{
+  "scenarios": [
+    {
+      "scenario": "valid_record",
+      "expected": "200 / model",
+      "status_code": 200,
+      "note": "baseline request",
+      "scorer": "model",
+      "decision": "step_up_verification",
+      "fraud_probability": 0.9621,
+      "warnings": []
+    },
+    {
+      "scenario": "missing_account_age",
+      "expected": "200 / model, warning",
+      "status_code": 200,
+      "note": "imputed with median",
+      "scorer": "model",
+      "decision": "step_up_verification",
+      "fraud_probability": 0.9393,
+      "warnings": [
+        "account_age_days missing; imputed with training median"
+      ]
+    },
+    {
+      "scenario": "new_card_no_history",
+      "expected": "200 / model, warnings",
+      "status_code": 200,
+      "note": "first 30 days of a card: history features missing",
+      "scorer": "model",
+      "decision": "step_up_verification",
+      "fraud_probability": 0.9592,
+      "warnings": [
+        "no 30-day history (new card); ratio feature imputed",
+        "no previous transaction; gap feature imputed"
+      ]
+    },
+    {
+      "scenario": "unseen_merchant_category",
+      "expected": "200 / model, warning",
+      "status_code": 200,
+      "note": "category never seen in training: all-zero encoding",
+      "scorer": "model",
+      "decision": "approve",
+      "fraud_probability": 0.9165,
+      "warnings": [
+        "unseen merchant_category; encoded as all-zero"
+      ]
+    },
+    {
+      "scenario": "missing_merchant_category",
+      "expected": "200 / model, warning",
+      "status_code": 200,
+      "note": "treated as unknown",
+      "scorer": "model",
+      "decision": "approve",
+      "fraud_probability": 0.9165,
+      "warnings": [
+        "merchant_category missing; treated as unknown"
+      ]
+    },
+    {
+      "scenario": "extreme_amount_plausible",
+      "expected": "200 / model, warning",
+      "status_code": 200,
+      "note": "valid but above training 99.9th percentile",
+      "scorer": "model",
+      "decision": "step_up_verification",
+      "fraud_probability": 0.9999,
+      "warnings": [
+        "amount above training 99.9th percentile"
+      ]
+    },
+    {
+      "scenario": "negative_amount",
+      "expected": "422",
+      "status_code": 422,
+      "note": "impossible value",
+      "validation_errors": [
+        "amount"
+      ]
+    },
+    {
+      "scenario": "amount_over_limit",
+      "expected": "422",
+      "status_code": 422,
+      "note": "outside plausible domain",
+      "validation_errors": [
+        "amount"
+      ]
+    },
+    {
+      "scenario": "malformed_timestamp",
+      "expected": "422",
+      "status_code": 422,
+      "note": "type violation",
+      "validation_errors": [
+        "timestamp"
+      ]
+    },
+    {
+      "scenario": "flag_not_binary",
+      "expected": "422",
+      "status_code": 422,
+      "note": "range violation",
+      "validation_errors": [
+        "is_international"
+      ]
+    },
+    {
+      "scenario": "negative_velocity",
+      "expected": "422",
+      "status_code": 422,
+      "note": "range violation",
+      "validation_errors": [
+        "txn_count_1h"
+      ]
+    },
+    {
+      "scenario": "missing_transaction_id",
+      "expected": "422",
+      "status_code": 422,
+      "note": "required field null",
+      "validation_errors": [
+        "transaction_id"
+      ]
+    },
+    {
+      "scenario": "unknown_extra_field",
+      "expected": "422",
+      "status_code": 422,
+      "note": "extra fields forbidden (PII guard)",
+      "validation_errors": [
+        "card_number"
+      ]
+    },
+    {
+      "scenario": "model_outage",
+      "expected": "200 / fallback_heuristic",
+      "status_code": 200,
+      "scorer": "fallback_heuristic",
+      "decision": "approve",
+      "fraud_probability": 0.1,
+      "note": "ML scorer raises; rule engine answers"
+    },
+    {
+      "scenario": "model_and_rule_outage",
+      "expected": "200 / fallback_prior, flag_for_review",
+      "status_code": 200,
+      "scorer": "fallback_prior",
+      "decision": "flag_for_review",
+      "note": "fail-safe: send to manual review"
+    },
+    {
+      "scenario": "batch_with_one_invalid_record",
+      "expected": "422 (whole request rejected)",
+      "status_code": 422,
+      "note": "online batch is all-or-nothing; the CLI isolates bad rows instead"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "vectorised_scoring": [
+    {
+      "batch_size": 1000,
+      "median_seconds": 0.008,
+      "records_per_second": 124629.4
+    },
+    {
+      "batch_size": 10000,
+      "median_seconds": 0.0195,
+      "records_per_second": 513108.3
+    },
+    {
+      "batch_size": 50000,
+      "median_seconds": 0.1078,
+      "records_per_second": 463690.4
+    }
+  ],
+  "end_to_end_cli": {
+    "status": "completed",
+    "input_rows": 50579,
+    "scored": 50579,
+    "invalid": 0,
+    "flagged": 478,
+    "elapsed_seconds": 0.301,
+    "records_per_second": 168149.8,
+    "output": "/home/claude/fraud-detection-ml-system/data/processed/test_scored.csv"
+  }
+}

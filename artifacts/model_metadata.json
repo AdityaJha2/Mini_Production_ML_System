@@ -1,0 +1,170 @@
+{
+  "model_version": "fraud-v1-logistic_regression_balanced",
+  "trained_at_utc": "2026-11-22T14:55:26+00:00",
+  "champion_selection": {
+    "logistic_regression_balanced": 0.2162,
+    "hist_gradient_boosting_balanced": 0.1801
+  },
+  "champion": "logistic_regression_balanced",
+  "challenger": "hist_gradient_boosting_balanced",
+  "hyperparameters": {
+    "C": 1.0
+  },
+  "hyperparameter_search": [
+    {
+      "learning_rate": 0.05,
+      "max_leaf_nodes": 15,
+      "l2_regularization": 0.0,
+      "valid_pr_auc": 0.1751
+    },
+    {
+      "learning_rate": 0.05,
+      "max_leaf_nodes": 15,
+      "l2_regularization": 1.0,
+      "valid_pr_auc": 0.1801
+    },
+    {
+      "learning_rate": 0.05,
+      "max_leaf_nodes": 31,
+      "l2_regularization": 0.0,
+      "valid_pr_auc": 0.1514
+    },
+    {
+      "learning_rate": 0.05,
+      "max_leaf_nodes": 31,
+      "l2_regularization": 1.0,
+      "valid_pr_auc": 0.1653
+    },
+    {
+      "learning_rate": 0.1,
+      "max_leaf_nodes": 15,
+      "l2_regularization": 0.0,
+      "valid_pr_auc": 0.1727
+    },
+    {
+      "learning_rate": 0.1,
+      "max_leaf_nodes": 15,
+      "l2_regularization": 1.0,
+      "valid_pr_auc": 0.173
+    },
+    {
+      "learning_rate": 0.1,
+      "max_leaf_nodes": 31,
+      "l2_regularization": 0.0,
+      "valid_pr_auc": 0.129
+    },
+    {
+      "learning_rate": 0.1,
+      "max_leaf_nodes": 31,
+      "l2_regularization": 1.0,
+      "valid_pr_auc": 0.1341
+    }
+  ],
+  "decision_threshold": 0.927654202297283,
+  "threshold_policy": "minimise cost: 150 per missed fraud, 15 per false alarm",
+  "cost_assumptions": {
+    "false_negative": 150.0,
+    "false_positive": 15.0
+  },
+  "heuristic_threshold": 0.3,
+  "amount_p999_train": 676.1310000000033,
+  "features": [
+    "amount_log",
+    "is_night",
+    "hour_sin",
+    "hour_cos",
+    "day_of_week",
+    "is_international",
+    "device_new",
+    "account_age_days",
+    "txn_count_1h",
+    "txn_count_24h",
+    "amount_ratio_log",
+    "seconds_since_last_log",
+    "merchant_category",
+    "channel"
+  ],
+  "transformed_feature_names": [
+    "amount_log",
+    "is_night",
+    "hour_sin",
+    "hour_cos",
+    "day_of_week",
+    "is_international",
+    "device_new",
+    "account_age_days",
+    "txn_count_1h",
+    "txn_count_24h",
+    "amount_ratio_log",
+    "seconds_since_last_log",
+    "missingindicator_account_age_days",
+    "missingindicator_amount_ratio_log",
+    "missingindicator_seconds_since_last_log",
+    "merchant_category_dining",
+    "merchant_category_electronics",
+    "merchant_category_fuel",
+    "merchant_category_gift_cards",
+    "merchant_category_grocery",
+    "merchant_category_luxury_goods",
+    "merchant_category_online_gaming",
+    "merchant_category_other",
+    "merchant_category_travel",
+    "merchant_category_unknown",
+    "merchant_category_utilities",
+    "channel_atm",
+    "channel_online",
+    "channel_pos"
+  ],
+  "splits": [
+    {
+      "partition": "train",
+      "dates": "2025-01-01 to 2025-04-30",
+      "rows": 202796,
+      "cards": 4987,
+      "frauds": 1238,
+      "fraud_rate": 0.0061
+    },
+    {
+      "partition": "validation",
+      "dates": "2025-05-01 to 2025-05-30",
+      "rows": 50563,
+      "cards": 4871,
+      "frauds": 294,
+      "fraud_rate": 0.00581
+    },
+    {
+      "partition": "test",
+      "dates": "2025-05-31 to 2025-06-29",
+      "rows": 50579,
+      "cards": 4867,
+      "frauds": 276,
+      "fraud_rate": 0.00546
+    }
+  ],
+  "train_fraud_rate": 0.006105,
+  "validation_metrics": {
+    "threshold": 0.927654,
+    "pr_auc": 0.2162,
+    "roc_auc": 0.8816,
+    "precision": 0.1957,
+    "recall": 0.3367,
+    "f1_positive": 0.2475,
+    "f1_macro": 0.6207,
+    "brier": 0.136376,
+    "recall_at_precision_0_5": 0.1735,
+    "flag_rate": 0.01001,
+    "expected_cost_per_1000_txn": 699.23,
+    "confusion_matrix": {
+      "tn": 49862,
+      "fp": 407,
+      "fn": 195,
+      "tp": 99
+    }
+  },
+  "environment": {
+    "python": "3.12.3",
+    "sklearn": "1.5.2",
+    "numpy": "1.26.4"
+  },
+  "training_seconds": 71.59
+}
