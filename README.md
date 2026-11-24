@@ -1,4 +1,4 @@
-# Card Fraud Detection: Mini Production ML System (Option B)
+# Card Fraud Detection: Mini Production ML System
 
 **Student:** Aditya Jha  |  **Roll no.:** 2025em1200044  |  **Course:** ML Model Engineering, WILP
 
