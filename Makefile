@@ -2,7 +2,7 @@
 PY ?= python3
 STUDENT_ID ?= 2025em1200044
 STUDENT_NAME ?= Aditya Jha
-REPO_URL ?= https://github.com/<your-username>/fraud-detection-ml-system
+REPO_URL ?= https://github.com/AdityaJha2/Mini_Production_ML_System
 
 .PHONY: all install data train evaluate test robustness serve benchmark report clean
 

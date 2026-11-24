@@ -7,7 +7,7 @@ preprocessing, cost-sensitive class-weighted models, serialized artifacts, a val
 online service, a batch CLI, latency and throughput profiling, robustness tests, PSI/KS drift
 monitoring and a four-tier fallback.
 
-Repository: `https://github.com/<your-username>/fraud-detection-ml-system`
+Repository: `https://github.com/AdityaJha2/Mini_Production_ML_System`
 
 ## 1. Quickstart (Python 3.12)
 ```bash

@@ -1,7 +1,7 @@
 """Build the consolidated assignment PDF from the project's own outputs.
 
     python -m report.build_report --student-id 2025em1200044 --student-name "Aditya Jha" \
-        --repo-url https://github.com/<you>/fraud-detection-ml-system
+        --repo-url https://github.com/AdityaJha2/Mini_Production_ML_System
 
 Every number is read from artifacts/ or reports/ (and the sample request is scored live), so the PDF
 matches the code that produced it.
@@ -125,6 +125,35 @@ def build(student_id, student_name, repo_url, out_path: Path):
                   "row per transaction, a rare binary label (about 0.6%), skewed amounts, missing values and "
                   "compromised-card bursts. Absolute metric values will differ on real data. Section 7 covers this.",
                   S["body"]))
+    add(PageBreak())
+
+    # ------------------------------------------------------------ Executive summary
+    tm = {k: v for k, v in test.items()}
+    ch = next(v for k, v in tm.items() if v["role"] == "champion")
+    pr_ = tm["Prior (dummy)"]
+    add(Paragraph("Executive Summary", S["h1"]))
+    add(Paragraph(
+        f"This report documents a card-fraud detection system built as a complete production pipeline, from leak-free "
+        f"preprocessing to a monitored API. The champion model, a class-weighted logistic regression, reaches test PR-AUC "
+        f"{ch['pr_auc']:.3f} against {pr_['pr_auc']:.4f} for the prior. A cost-driven threshold reduces expected loss from "
+        f"{pr_['expected_cost_per_1000_txn']:.0f} to {ch['expected_cost_per_1000_txn']:.0f} per 1,000 transactions on the "
+        f"held-out test window (days 150 to 179). The online API answers with p50 {bapi['latency_ms']['p50']:.1f} ms and "
+        f"p95 {bapi['latency_ms']['p95']:.1f} ms, with {bapi['errors']} errors in {bapi['requests']:,} requests. The batch "
+        f"CLI scores about {bbat['end_to_end_cli']['records_per_second']:,.0f} records per second end to end. Scoring "
+        f"degrades through three fallback tiers, so every request still receives a decision.", S["body"]))
+    add(tbl([
+        ["Key result", "Value", "Where to verify"],
+        ["Champion test PR-AUC", f"{ch['pr_auc']:.3f}", "reports/metrics_test.json"],
+        ["Expected cost per 1,000 transactions (prior to champion)", f"{pr_['expected_cost_per_1000_txn']:.0f} to {ch['expected_cost_per_1000_txn']:.0f}", "reports/metrics_test.json"],
+        ["API latency p50 / p95 / p99 (ms)", f"{bapi['latency_ms']['p50']:.1f} / {bapi['latency_ms']['p95']:.1f} / {bapi['latency_ms']['p99']:.1f}", "reports/benchmark_api.json"],
+        ["Batch throughput (records/s, end to end)", f"{bbat['end_to_end_cli']['records_per_second']:,.0f}", "reports/benchmark_batch.json"],
+        ["Robustness scenarios run", f"{len(rob['scenarios'])}", "reports/robustness.json"],
+    ], [7.2 * cm, 4.2 * cm, W - 11.4 * cm], S))
+    add(Spacer(1, 5))
+    add(Paragraph("<b>Recommendation.</b> Deploy the champion behind the validated API, with the batch path for overnight "
+                  "rescoring. Before go-live, recalibrate the probabilities, confirm the cost assumptions with the fraud "
+                  "operations team, and validate the model on the bank's own labelled transactions. Two limitations apply "
+                  "throughout: the data is synthetic (Section 7), and the costs are assumptions.", S["body"]))
     add(PageBreak())
 
     # ------------------------------------------------------------ 1
@@ -455,7 +484,7 @@ def main(argv=None):
     p = argparse.ArgumentParser(description="Build the assignment PDF report")
     p.add_argument("--student-id", default="2025em1200044")
     p.add_argument("--student-name", default="Aditya Jha")
-    p.add_argument("--repo-url", default="https://github.com/<your-username>/fraud-detection-ml-system")
+    p.add_argument("--repo-url", default="https://github.com/AdityaJha2/Mini_Production_ML_System")
     args = p.parse_args(argv)
     out = REP / f"MLME_Assignment_{args.student_id}_{'_'.join(args.student_name.split())}.pdf"
     build(args.student_id, args.student_name, args.repo_url, out)
