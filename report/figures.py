@@ -18,7 +18,7 @@ def _arrow(ax, x1, y1, x2, y2):
 def architecture(path):
     fig, ax = plt.subplots(figsize=(7.2, 4.4))
     ax.set_xlim(-0.02, 1.02)
-    ax.set_ylim(-0.16, 1.0)
+    ax.set_ylim(-0.25, 1.0)
     ax.axis("off")
     blue, green, orange, grey = "#dbeafe", "#dcfce7", "#ffedd5", "#f3f4f6"
 
@@ -52,9 +52,10 @@ def architecture(path):
     ax.text(0.80, 0.585, "scorer loads artifacts at startup", fontsize=6.5, color="#2563eb", ha="center")
     ax.text(0.58, 0.245, "batch CLI loads the same artifacts", fontsize=6.5, color="#2563eb", ha="center")
 
-    _box(ax, 0.01, -0.13, 0.98, 0.075,
-         "MONITORING:  PSI and KS drift vs training reference   |   p95 latency, error and fallback rate   |   "
-         "label-delayed PR-AUC  ->  alert / retrain", "#fef9c3")
+    _box(ax, 0.01, -0.22, 0.98, 0.16,
+         "MONITORING\n"
+         "PSI and KS drift vs training reference   |   p95 latency, error and fallback rates\n"
+         "label-delayed PR-AUC (concept drift)   ->   alert or retrain", "#fef9c3")
     fig.tight_layout()
     fig.savefig(path, dpi=170, bbox_inches="tight")
     plt.close(fig)

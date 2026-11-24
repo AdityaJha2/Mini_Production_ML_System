@@ -54,6 +54,7 @@ records/second.
 uvicorn serving.app:app --port 8000 &          # start the server first
 python -m serving.benchmark --mode api --requests 1000   # p50 / p95 / p99 -> reports/benchmark_api.json
 python -m serving.benchmark --mode batch                 # records/sec      -> reports/benchmark_batch.json
+python -m serving.benchmark --mode api --requests 2000 --concurrency 8   # load test -> reports/benchmark_api_c8.json
 ```
 
 ## 5. Layout

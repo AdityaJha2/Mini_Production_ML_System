@@ -1,0 +1,21 @@
+{
+  "mode": "api_concurrent",
+  "url": "http://127.0.0.1:8000",
+  "concurrency": 16,
+  "requests": 2000,
+  "warmup_requests": 50,
+  "errors": 0,
+  "error_rate": 0.0,
+  "latency_ms": {
+    "p50": 216.3,
+    "p95": 342.69,
+    "p99": 413.64,
+    "mean": 219.97,
+    "max": 483.19
+  },
+  "wall_seconds": 28.079,
+  "throughput_rps": 71.2,
+  "scorers_seen": {
+    "model": 2000
+  }
+}

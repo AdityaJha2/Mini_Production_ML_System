@@ -60,35 +60,56 @@ def _payloads(df: pd.DataFrame, n: int) -> list[dict]:
     return recs
 
 
-def bench_api(url: str, n: int, warmup: int) -> dict:
+def _one_request(client: httpx.Client, body: dict):
+    t0 = time.perf_counter()
+    try:
+        r = client.post("/predict", json=body)
+        ok = r.status_code == 200
+        scorer = r.json()["scorer"] if ok else None
+    except httpx.HTTPError:
+        ok, scorer = False, None
+    return (time.perf_counter() - t0) * 1000, ok, scorer
+
+
+def bench_api(url: str, n: int, warmup: int, concurrency: int = 1) -> dict:
+    """Latency percentiles and throughput. concurrency > 1 runs that many clients in parallel."""
+    from concurrent.futures import ThreadPoolExecutor
     df = export_test_partition()
     payloads = _payloads(df, n + warmup)
-    lat, errors, scorers = [], 0, {}
-    with httpx.Client(base_url=url, timeout=10.0) as client:
-        for i, body in enumerate(payloads):
-            t0 = time.perf_counter()
-            ok = False
-            try:
-                r = client.post("/predict", json=body)
-                ok = r.status_code == 200
-                if ok:
-                    s = r.json()["scorer"]
-                    scorers[s] = scorers.get(s, 0) + 1
-            except httpx.HTTPError:
-                ok = False
-            dt = (time.perf_counter() - t0) * 1000
-            if i >= warmup:
-                lat.append(dt)
-                errors += 0 if ok else 1
-    total = sum(lat) / 1000
+    warm, measured = payloads[:warmup], payloads[warmup:]
+    with httpx.Client(base_url=url, timeout=10.0) as c:
+        for body in warm:
+            _one_request(c, body)
+
+    def worker(chunk):
+        with httpx.Client(base_url=url, timeout=10.0) as client:
+            return [_one_request(client, b) for b in chunk]
+
+    chunks = [measured[i::concurrency] for i in range(concurrency)]
+    t0 = time.perf_counter()
+    if concurrency == 1:
+        results = worker(measured)
+    else:
+        with ThreadPoolExecutor(max_workers=concurrency) as ex:
+            results = [r for part in ex.map(worker, chunks) for r in part]
+    wall = time.perf_counter() - t0
+
+    lat = [r[0] for r in results]
+    errors = sum(1 for r in results if not r[1])
+    scorers = {}
+    for r in results:
+        if r[2]:
+            scorers[r[2]] = scorers.get(r[2], 0) + 1
     return {
-        "mode": "api_sequential", "url": url, "requests": len(lat), "warmup_requests": warmup,
+        "mode": "api_sequential" if concurrency == 1 else "api_concurrent",
+        "url": url, "concurrency": concurrency, "requests": len(lat), "warmup_requests": warmup,
         "errors": errors, "error_rate": round(errors / len(lat), 6),
         "latency_ms": {"p50": round(float(np.percentile(lat, 50)), 2),
                        "p95": round(float(np.percentile(lat, 95)), 2),
                        "p99": round(float(np.percentile(lat, 99)), 2),
                        "mean": round(statistics.fmean(lat), 2), "max": round(max(lat), 2)},
-        "throughput_rps": round(len(lat) / total, 1),
+        "wall_seconds": round(wall, 3),
+        "throughput_rps": round(len(lat) / wall, 1),
         "scorers_seen": scorers,
     }
 
@@ -119,11 +140,13 @@ def main(argv=None):
     p.add_argument("--url", default="http://127.0.0.1:8000")
     p.add_argument("--requests", type=int, default=1000)
     p.add_argument("--warmup", type=int, default=50)
+    p.add_argument("--concurrency", type=int, default=1, help="parallel clients (1 = sequential)")
     args = p.parse_args(argv)
     config.REPORT_DIR.mkdir(parents=True, exist_ok=True)
     if args.mode == "api":
-        res = bench_api(args.url, args.requests, args.warmup)
-        out = config.REPORT_DIR / "benchmark_api.json"
+        res = bench_api(args.url, args.requests, args.warmup, args.concurrency)
+        out = config.REPORT_DIR / ("benchmark_api.json" if args.concurrency == 1
+                                   else f"benchmark_api_c{args.concurrency}.json")
     else:
         res = bench_batch()
         out = config.REPORT_DIR / "benchmark_batch.json"

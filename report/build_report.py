@@ -86,7 +86,13 @@ def build(student_id, student_name, repo_url, out_path: Path):
     bapi = _load(REP / "benchmark_api.json")
     bbat = _load(REP / "benchmark_batch.json")
     drift = pd.read_csv(REP / "drift_monthly.csv")
-    n_tests = sum(len(re.findall(r"^def test_", p.read_text(), re.M)) for p in (config.ROOT / "tests").glob("test_*.py"))
+    import subprocess, sys
+    coll = subprocess.run([sys.executable, "-m", "pytest", "--co", "-q"], cwd=config.ROOT,
+                          capture_output=True, text=True).stdout
+    m = re.search(r"(\d+) tests? collected", coll)
+    n_tests = int(m.group(1)) if m else -1
+    bc8 = _load(REP / "benchmark_api_c8.json")
+    bc16 = _load(REP / "benchmark_api_c16.json")
     FIG.mkdir(parents=True, exist_ok=True)
     architecture(FIG / "architecture.png")
     example = _live_example()
@@ -140,7 +146,9 @@ def build(student_id, student_name, repo_url, out_path: Path):
         f"held-out test window (days 150 to 179). The online API answers with p50 {bapi['latency_ms']['p50']:.1f} ms and "
         f"p95 {bapi['latency_ms']['p95']:.1f} ms, with {bapi['errors']} errors in {bapi['requests']:,} requests. The batch "
         f"CLI scores about {bbat['end_to_end_cli']['records_per_second']:,.0f} records per second end to end. Scoring "
-        f"degrades through three fallback tiers, so every request still receives a decision.", S["body"]))
+        f"degrades through three fallback tiers, so every request still receives a decision. Under 8 concurrent clients on the "
+        f"single-core build machine, p95 rose to {bc8['latency_ms']['p95']:.0f} ms, above the 100 ms SLO, so the production "
+        f"target needs more CPU capacity and a load test (Section 5.1).", S["body"]))
     add(tbl([
         ["Key result", "Value", "Where to verify"],
         ["Champion test PR-AUC", f"{ch['pr_auc']:.3f}", "reports/metrics_test.json"],
@@ -199,6 +207,14 @@ def build(student_id, student_name, repo_url, out_path: Path):
                   "(about 1.5%), missing <font face='Courier'>merchant_category</font> (about 0.5%), and bursts of 25 "
                   "transactions on about 3% of cards (compromised cards). The loader checks required columns, parses "
                   "timestamps and rejects duplicate transaction IDs.", S["body"]))
+    add(Paragraph("<b>Why this data.</b> The rubric asks for a well-justified data choice. The build environment had no "
+                  "access to Kaggle or IEEE-CIS, so the generator reproduces the properties that matter for this design: a "
+                  "rare binary label, a timeline long enough for a temporal split, history-dependent signals (bursts "
+                  "on compromised cards), realistic missingness, and heavy-tailed amounts. Because the data is "
+                  "reproducible from a seed, every reported number can be regenerated and audited. The limitation is "
+                  "stated, not hidden: the absolute metrics and the strength of individual signals are not evidence "
+                  "about real fraud. The replacement path is documented in the README. A real CSV with the same columns "
+                  "needs no code change; only the velocity features are recomputed from its own history.", S["body"]))
     add(Paragraph("<b>2.2 Partitioning.</b> Fraud patterns change over time, so the split is by calendar day, not at "
                   "random. Training covers days 0 to 119, validation days 120 to 149 and test days 150 to 179. "
                   "Every choice (champion, hyper-parameters, threshold) is made on validation data. The test set is "
@@ -215,11 +231,25 @@ def build(student_id, student_name, repo_url, out_path: Path):
                   "<font face='Courier'>tests/test_pipeline.py</font> alters later transactions and confirms that "
                   "earlier features do not change. In production the upstream feature service computes the same values "
                   "from its transaction store.", S["body"]))
-    add(Paragraph("<b>2.4 Leakage safeguards, summary.</b> (i) Velocity features look only backwards in time. "
-                  "(ii) The temporal split is asserted to have no overlap. (iii) Imputers, the scaler and the one-hot "
-                  "encoder are fitted on training rows only, and the test checks that the scaler mean equals the "
-                  "training mean. (iv) Unseen categories are encoded as all zeros. (v) The drift reference comes from "
-                  "training rows only.", S["body"]))
+    add(Paragraph("<b>2.4 Leakage audit.</b> Each potential source of look-ahead or information leakage, how it is "
+                  "prevented, and the test or code path that verifies it:", S["body"]))
+    add(tbl([
+        ["Potential leak", "Prevention in the code", "Verification"],
+        ["Future transactions used for velocity features", "history found by binary search over earlier timestamps only",
+         "tests/test_pipeline.py: altering later rows leaves earlier features unchanged"],
+        ["Random split mixes past and future", "split by calendar day with assertions for no overlap",
+         "tests/test_pipeline.py: temporal split has no time overlap"],
+        ["Preprocessing statistics from validation or test", "imputers, scaler and encoder fitted on training rows only",
+         "tests/test_pipeline.py: scaler mean equals the training mean, not the full-data mean"],
+        ["Threshold tuned on the test set", "cost threshold chosen on validation data in train.py",
+         "src/evaluate.py asserts the stored threshold reproduces from validation data"],
+        ["Champion chosen on the test set", "candidates compared on validation PR-AUC before test is read",
+         "train.py logs the selection; evaluate.py loads only the saved champion"],
+        ["Unseen category leaks through encoding", "unseen categories encoded as all zeros, never refitted",
+         "tests/test_pipeline.py: unseen category produces an all-zero block"],
+        ["Drift reference contains test data", "reference statistics built from the training partition only",
+         "train.py calls build_reference_stats(train) only"],
+    ], [4.6 * cm, 6.2 * cm, W - 10.8 * cm], S))
 
     # ------------------------------------------------------------ 3
     add(Paragraph("3. Preprocessing, Baseline &amp; Model Engineering", S["h1"]))
@@ -251,7 +281,7 @@ def build(student_id, student_name, repo_url, out_path: Path):
     rows = [["Model (test, days 150-179)", "Role", "Thr.", "PR-AUC", "ROC-AUC", "Recall", "Recall @ P 0.50",
              "F1 macro", "Cost/1k txn", "Brier"]]
     for name, r in test.items():
-        rows.append([name.replace("_", " "), r["role"], f"{r['threshold']:.3f}", f"{r['pr_auc']:.3f}",
+        rows.append([name.replace("_", " "), r["role"], f"{r['threshold']:.3f}", f"{r['pr_auc']:.4f}",
                      f"{r['roc_auc']:.3f}", f"{r['recall']:.3f}",
                      f"{r['recall_at_precision_0_5']:.3f}" if r["recall_at_precision_0_5"] is not None else "n/a",
                      f"{r['f1_macro']:.3f}", f"{r['expected_cost_per_1000_txn']:.0f}", f"{r['brier']:.4f}"])
@@ -303,27 +333,38 @@ def build(student_id, student_name, repo_url, out_path: Path):
                   "flagged. The run logs its status to stdout and to <font face='Courier'>logs/batch.log</font>.", S["body"]))
     add(Paragraph("<b>4.3 Packaging.</b> <font face='Courier'>requirements.txt</font> pins every dependency. The "
                   "<font face='Courier'>Makefile</font> provides one-command targets, the README gives curl and CLI examples, "
-                  "and a <font face='Courier'>Dockerfile</font> is included as an optional container build.", S["body"]))
+                  "and a <font face='Courier'>Dockerfile</font> is included. The Dockerfile was not built in this assessment, "
+                  "because no container engine was available. The pinned requirements were instead installed into a clean "
+                  "virtual environment, and the full test suite passed there, which is the reproducibility evidence used.", S["body"]))
     add(Paragraph("<b>4.4 Real response for the sample request</b> (scored live when this report was built, "
                   "<font face='Courier'>examples/one_request.json</font>):", S["body"]))
     add(tbl([["Field", "Value"]] + [[k, str(v)] for k, v in example.items()], [4.0 * cm, W - 4.0 * cm], S))
 
     # ------------------------------------------------------------ 5
     add(Paragraph("5. Operational Analysis, Profiling &amp; Drift Monitoring", S["h1"]))
-    lat = bapi["latency_ms"]
-    add(Paragraph(f"<b>5.1 Online latency.</b> Measured with <font face='Courier'>serving/benchmark.py</font>: "
-                  f"{bapi['requests']:,} sequential HTTP requests (JSON in and out) to a local uvicorn process after "
-                  f"{bapi['warmup_requests']} warm-up requests, on the build machine. Errors: {bapi['errors']} "
-                  f"({bapi['error_rate']:.2%}). The percentile table is measured, not estimated.", S["body"]))
-    add(tbl([["p50 (ms)", "p95 (ms)", "p99 (ms)", "mean (ms)", "max (ms)", "throughput (sequential)"],
-             [f"{lat['p50']:.2f}", f"{lat['p95']:.2f}", f"{lat['p99']:.2f}", f"{lat['mean']:.2f}",
-              f"{lat['max']:.2f}", f"{bapi['throughput_rps']:.1f} req/s"]],
-            [2.4 * cm, 2.4 * cm, 2.4 * cm, 2.4 * cm, 2.4 * cm, W - 12.0 * cm], S))
+    bc1 = bapi
+    rows = [["Concurrent clients", "Requests", "p50 (ms)", "p95 (ms)", "p99 (ms)", "max (ms)", "Throughput (req/s)", "Errors"]]
+    for c_, d_ in [(1, bc1), (8, bc8), (16, bc16)]:
+        L = d_["latency_ms"]
+        rows.append([str(c_), f"{d_['requests']:,}", f"{L['p50']:.2f}", f"{L['p95']:.2f}", f"{L['p99']:.2f}",
+                     f"{L['max']:.2f}", f"{d_['throughput_rps']:.1f}", str(d_["errors"])])
+    add(Paragraph(f"<b>5.1 Online latency under load.</b> Measured with <font face='Courier'>serving/benchmark.py</font>: "
+                  f"{bc1['requests']:,} HTTP requests per run (JSON in and out), after {bc1['warmup_requests']} warm-up "
+                  f"requests, at 1, 8 and 16 concurrent clients. Each row is a separate run against the same local uvicorn "
+                  f"process. Errors: {sum(d['errors'] for d in (bc1, bc8, bc16))} across all three runs.", S["body"]))
+    add(tbl(rows, [2.6 * cm, 1.8 * cm, 1.8 * cm, 1.8 * cm, 1.8 * cm, 1.8 * cm, 2.6 * cm, W - 14.2 * cm], S))
     add(Spacer(1, 4))
-    add(Paragraph(f"The worst request ({lat['max']:.2f} ms) is above the 50 ms per-request budget, so the service counts it "
-                  f"as slow. The <font face='Courier'>/metrics</font> endpoint reports a rolling scoring-time p95 separately. "
-                  f"That figure excludes HTTP overhead, so it is not comparable with the end-to-end percentiles above. "
-                  f"The budget is a monitored signal; it does not abort scoring.", S["body"]))
+    add(Paragraph(f"<b>Interpretation.</b> With one client, p95 is {bc1['latency_ms']['p95']:.1f} ms, inside the 100 ms SLO. "
+                  f"Throughput stops rising at about {bc8['throughput_rps']:.0f} requests per second. At 8 clients p95 is "
+                  f"{bc8['latency_ms']['p95']:.0f} ms, and at 16 clients it is {bc16['latency_ms']['p95']:.0f} ms, so both are "
+                  f"above the SLO. Latency grows with queue length, not with the model, because the scoring itself takes "
+                  f"milliseconds. The build machine has one CPU core, which the load generator and the server share. "
+                  f"The concurrency figures are therefore pessimistic for production hardware, but they show the saturation "
+                  f"point. A load test on the target hardware is required before go-live, and the number of workers and "
+                  f"instances should be sized from it.", S["body"]))
+    add(Paragraph(f"The per-request budget is 50 ms. Even the sequential run has requests above it (worst "
+                  f"{bc1['latency_ms']['max']:.1f} ms), so the service counts them as slow. The budget is a monitored "
+                  f"signal, and scoring is never aborted for it.", S["body"]))
     add(Paragraph("<b>5.2 Batch throughput.</b> Vectorised scoring is timed at three batch sizes (median of three repeats). "
                   "An end-to-end CLI run on the full test partition includes CSV reading, validation and writing.",
                   S["body"]))
@@ -367,6 +408,11 @@ def build(student_id, student_name, repo_url, out_path: Path):
         rows.append([f] + [f"{piv.loc[f, c]:.3f}" for c in piv.columns])
     add(tbl(rows, [5.2 * cm] + [(W - 5.2 * cm) / len(piv.columns)] * len(piv.columns), S))
     add(Spacer(1, 4))
+    ks_row = drift[(drift["feature"] == "account_age_days") & (drift["month"] == "2025-06")].iloc[0]
+    add(Paragraph(f"<b>Account-age alert, disclosed.</b> On the June test window the KS statistic for account_age_days is "
+                  f"{ks_row['ks_stat']:.3f} (p = {ks_row['ks_p']:.2g}), so the rule reports {ks_row['status']}. Its PSI is "
+                  f"{ks_row['psi']:.3f}, which is below the WARNING band. The alert is reported, not suppressed. Its cause is "
+                  f"structural, since account age rises with calendar time, and Section 5.5 gives the response.", S["body"]))
     add(Paragraph("<b>Interpretation.</b> Transaction amounts, velocity counts and merchant mix are stable. Two features "
                   "show growing PSI, and both are structural rather than data faults. <b>account_age_days</b> rises by "
                   "one day per calendar day, so a fixed training window drifts by construction. <b>amount_mean_30d</b> and "
@@ -378,17 +424,17 @@ def build(student_id, student_name, repo_url, out_path: Path):
                   "plan therefore separates immediate signals from label-delayed ones.", S["body"]))
     add(tbl([
         ["Category", "Metric", "Threshold", "Action"],
-        ["Feature drift", "PSI per raw input vs training reference (daily on scored traffic)",
+        ["Data drift (covariate)", "PSI per raw input vs training reference (daily on scored traffic)",
          "WARNING 0.10; ALERT 0.25, or KS p &lt; 0.01 with KS stat at least 0.05",
          "WARNING: review. ALERT on two consecutive days: review retraining"],
-        ["Decision mix", "Share of step-up decisions per day", "more than 2x the validation flag rate",
+        ["Prediction drift", "Share of step-up decisions per day", "more than 2x the validation flag rate",
          "Check upstream feed and rule changes"],
         ["Data quality", "Missing rate per field; invalid-row share in batch runs", "invalid rows above 1%; missing rate up by 2 points",
          "Block batch publish; notify data owner"],
-        ["Model performance (delayed)", "PR-AUC and recall on each labelled week, after chargeback labels mature",
+        ["Concept drift (label-delayed)", "PR-AUC and recall on each labelled week, after chargeback labels mature",
          "PR-AUC down more than 10% vs champion validation value",
          "Trigger retrain; promote only if validation beats champion"],
-        ["Service latency", "p95 and p99 per endpoint; rolling p95 from /metrics", "p95 above 100 ms for 10 minutes",
+        ["System (latency)", "p95 and p99 per endpoint, at the measured concurrency; rolling p95 from /metrics", "p95 above 100 ms for 10 minutes",
          "Page on-call; scale replicas"],
         ["Service errors", "5xx rate from /metrics", "above 1% over 5 minutes", "Page on-call; check fallback use"],
         ["Fallback and budget", "Share of predictions with scorer != model; share over the 50 ms budget",
@@ -458,7 +504,9 @@ def build(student_id, student_name, repo_url, out_path: Path):
                   "build machine with a single worker. (iv) Class weighting distorts probability calibration, so the "
                   "threshold is set on the cost of decisions, not on calibrated probabilities. (v) Velocity features in "
                   "the online request are supplied by an upstream service that this project only simulates. (vi) The "
-                  "rule fallback is a heuristic, not a calibrated model.", S["body"]))
+                  "rule fallback is a heuristic, not a calibrated model. (vii) The build machine has one CPU core shared by the "
+                  "load generator and the server, so the concurrency results show the saturation point but are not a "
+                  "substitute for a load test on target hardware.", S["body"]))
     add(Paragraph("<b>Future work.</b> Calibrate the champion (Platt or isotonic scaling) and recompute the cost threshold; "
                   "add a real feature store for the history features; run a champion-challenger shadow deployment; add "
                   "authentication and rate limiting; and schedule drift and delayed-label jobs that write to a dashboard.",

@@ -1,19 +1,21 @@
 {
   "mode": "api_sequential",
   "url": "http://127.0.0.1:8000",
-  "requests": 1000,
+  "concurrency": 1,
+  "requests": 2000,
   "warmup_requests": 50,
   "errors": 0,
   "error_rate": 0.0,
   "latency_ms": {
-    "p50": 8.98,
-    "p95": 10.38,
-    "p99": 13.8,
-    "mean": 9.24,
-    "max": 60.55
+    "p50": 11.81,
+    "p95": 18.68,
+    "p99": 23.86,
+    "mean": 12.95,
+    "max": 122.26
   },
-  "throughput_rps": 108.2,
+  "wall_seconds": 25.928,
+  "throughput_rps": 77.1,
   "scorers_seen": {
-    "model": 1050
+    "model": 2000
   }
 }
